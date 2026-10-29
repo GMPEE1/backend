@@ -1,0 +1,88 @@
+﻿ID,RequirementRef,Suite,TestName,Level,Preconditions,AAA_Steps,Expected,Data,Priority
+UT-001,"6.10,5.1.4",score/computeIndicatorScore,คำนวณสเกล 1–4 ถูกต้อง,Unit,ไม่มี,"Arrange: input=ระดับ 1..4
+Act: เรียก computeScore(1),...,(4)
+Assert: ได้คะแนนตามสเกล/น้ำหนัก","ค่า 1→min, 4→max; รวมตาม weight","levels=1..4, weight=1.0",High
+UT-002,5.1.4,score/computeIndicatorScore,คำนวณแบบ yes/no,Unit,ไม่มี,"Arrange: indicator.type=yes_no, value=true/false
+Act: compute
+Assert: ได้ 1 หรือ 0*weight","true=ได้คะแนนเต็ม, false=0","type=yes_no, weight=0.5",High
+UT-003,7.4,validation/userInput,ตรวจรูปแบบอีเมล,Unit,ไม่มี,"Arrange: อีเมลผิด/ถูก
+Act: validateEmail
+Assert: invalid เมื่อไม่ตรง RFC","invalid สำหรับ 'a@', valid 'a@b.com'",list invalid/valid,Medium
+UT-004,5.1.2,validation/periods,ช่วงเวลาเปิด-ปิดไม่ย้อนแย้ง,Unit,ไม่มี,"Arrange: start>end
+Act: validatePeriod
+Assert: throw 422",ป้องกัน start หลัง end,"start=2025-12-31,end=2025-01-01",High
+UT-005,6.5,errors/handling,Map error → JSON มาตรฐาน,Unit,ไม่มี,"Arrange: create ValidationError
+Act: errorMiddleware
+Assert: 422 + {status,message,errors[]}",รูปแบบ response สม่ำเสมอ,mock error,High
+UT-006,6.3,files/mimeWhitelist,อนุญาต mimetype ที่กำหนด,Unit,ไม่มี,"Arrange: file.mimetype='application/pdf'
+Act: validate
+Assert: pass",pdf/word/excel/img ok,mimes list,High
+UT-007,6.3,files/mimeWhitelist,บล็อกไฟล์เกินขนาด,Unit,ไม่มี,"Arrange: size>MAX
+Act: validate
+Assert: 413",Payload too large,MAX=10MB,High
+IT-101,"6.4,6.10,7.1",auth/login,Login สำเร็จ (JWT),Integration,มีผู้ใช้ใน DB และรหัสผ่านถูก,"Arrange: seed user
+Act: POST /api/auth/login
+Assert: 200 + token + exp/role",รับ token (signed) และข้อมูลผู้ใช้ขั้นต่ำ,email/pass ถูกต้อง,High
+IT-102,"6.4,7.1",auth/login,Login ผิดรหัสผ่าน,Integration,มีผู้ใช้ใน DB,"Arrange: seed user
+Act: POST /api/auth/login (ผิด)
+Assert: 401",ไม่เปิดเผยรายละเอียดเกินจำเป็น,wrong password,High
+IT-103,6.1,auth/guard,สิทธิ์ role: evaluatee ห้ามเรียก admin-only,Integration,JWT ของ evaluatee,"Arrange: JWT role=evaluatee
+Act: POST /api/admin/...
+Assert: 403",ปกป้องทรัพยากรตาม role,role matrix,High
+IT-104,"6.1,6.2",periods/crud,สร้างรอบการประเมิน,Integration,มี JWT admin,"Arrange: payload valid
+Act: POST /api/periods
+Assert: 201 + DB inserted",ข้อมูลถูกบันทึก,period payload,High
+IT-105,6.1,periods/crud,ค้นหา periods ด้วย query,Integration,ตัวอย่างข้อมูลมีหลายช่วง,"Arrange: seed 2 ช่วง
+Act: GET /api/periods?active=true
+Assert: 200 + filtered",รองรับ query param,active=true,Medium
+IT-106,"5.1.3,6.1,6.2",topicsIndicators/crud,เพิ่มหัวข้อและตัวชี้วัด,Integration,JWT admin; มี period,"Arrange: POST topics→indicators
+Act: call endpoints
+Assert: 201 + relation ผูกถูกต้อง",น้ำหนัก/ชนิดหลักฐานถูกต้อง,topic/indicator payload,High
+IT-107,"5.1.4,6.1",topicsIndicators/crud,ตัวชี้วัดแบบสเกล/yes-no,Integration,มี topic,"Arrange: 2 ชนิด
+Act: POST indicators
+Assert: 201 + type validated",ยืนยันชนิด,"types=['scale','yes_no']",High
+IT-108,"5.1.8,5.3.1",assignments/flow,มอบหมายกรรมการ → เห็นงาน,Integration,มี evaluatee/evaluator,"Arrange: POST /api/assignments
+Act: GET /api/evaluator/tasks
+Assert: มีรายการ",เชื่อมโยงสำเร็จ,assign payload,High
+IT-109,"6.3,5.2.3",evidence/upload,อัปโหลดไฟล์ PDF ผ่าน API,Integration,มี JWT evaluatee; มี indicator-evidence mapping,"Arrange: attach pdf
+Act: POST /api/evidence
+Assert: 201 + เก็บ metadata/path",บันทึกเส้นทางไฟล์,sample.pdf,High
+IT-110,6.3,evidence/upload,บล็อก mimetype ไม่อนุญาต,Integration,มี JWT,"Arrange: upload .exe
+Act: POST
+Assert: 415",ป้องกันอันตราย,sample.exe,High
+IT-111,"6.5,6.6",errors/handling,404 Not Found (resource),Integration,ไม่มี resource id,"Arrange: GET /api/indicators/9999
+Act: call
+Assert: 404 + message",สื่อความหมาย,id=9999,Medium
+IT-112,"6.7,6.8",contract/openapi,Response ตรง schema,Integration,ติดตั้ง openapi validator,"Arrange: run middleware
+Act: hit endpoints
+Assert: ทุก response ผ่าน schema",ป้องกัน breaking change,openapi.json,High
+IT-113,6.9,structure/code,โครงสร้าง router/async/await ถูกต้อง,Integration,App ถูกประกอบตามแนวปฏิบัติ,"Arrange: lint rules
+Act: run lint
+Assert: ไร้ error","สะอาด, อ่านง่าย",eslint config,Low
+E2E-201,"7.1,5.2.x",e2e/evaluatee,Evaluatee: login→กรอก→แนบ→self-score→export,E2E,ระบบพร้อมใช้งาน; seed ขั้นต่ำ,"Arrange: visit login
+Act: ดำเนิน flow ครบ
+Assert: ไฟล์ export ได้, UI แสดง success",happy path เต็มเส้น,บัญชี evaluatee,High
+E2E-202,5.3.x,e2e/evaluator,Evaluator: login→ดูมอบหมาย→ให้คะแนน→ลงนาม,E2E,มี assignment แล้ว,"Arrange: login evaluator
+Act: ให้คะแนน/คอมเมนต์/ลงนาม
+Assert: สถานะเปลี่ยน & audit",ตรวจสถานะใน UI,บัญชี evaluator,High
+E2E-203,5.1.x,e2e/admin,Admin: สร้างรอบ→หัวข้อ→ตัวชี้วัด→มอบหมาย→รายงาน,E2E,สิทธิ์ admin,"Arrange: login admin
+Act: step by step
+Assert: รายงานสรุปมีข้อมูลตรง DB",end-to-end 管理,บัญชี admin,High
+E2E-204,"7.7,7.8",e2e/responsive,Responsive & Console clean,E2E,UI route พร้อม,"Arrange: set viewport (mobile/tablet/desktop)
+Act: browse dashboard
+Assert: ไม่ overflow, ไม่ error logs",สำคัญต่อ UX,3 breakpoints,Medium
+E2E-205,7.6,e2e/api-journey,ทดสอบบริการ API ≥3 รายการผ่าน UI,E2E,เส้นทางหน้าจอพร้อม,"Arrange: เปิดหน้าเกี่ยวข้อง
+Act: กระตุ้น POST/GET/PUT
+Assert: คำขอสำเร็จ (Network 2xx)",สังเกต Network,browser devtools,Medium
+NF-301,6.x,security/authz,Forbidden เมื่อไม่มี token,NonFunctional,ไม่มี JWT,"Arrange: เรียก endpoint ต้องการสิทธิ์
+Act: GET/POST โดยไม่ส่ง Authorization
+Assert: 401",ค่าเริ่มต้นปลอดภัย,—,High
+NF-302,6.1,security/role-matrix,Least privilege สำหรับทุกบทบาท,NonFunctional,บัญชีสามบทบาท,"Arrange: สร้างเมทริกซ์สิทธิ์
+Act: fuzz endpoints ตามบทบาท
+Assert: เฉพาะสิทธิ์ที่ได้รับ",ยืนยัน policy,role matrix,High
+NF-303,6.3,files/storage,ทำความสะอาดไฟล์ชั่วคราวหลังทดสอบ,NonFunctional,มีพื้นที่ tmp,"Arrange: upload หลายไฟล์
+Act: จบ test
+Assert: tmp ว่าง",ไม่รั่วไหลทรัพยากร,—,Low
+NF-304,—,performance/smoke,Latency API พื้นฐาน < 300ms (p95),NonFunctional,โหมด test,"Arrange: wrk/k6 เล็กน้อย
+Act: ตี 100 req/endpoint สำคัญ
+Assert: p95 < เป้าหมาย",เฝ้าระวังเบื้องต้น,k6 script,Low
