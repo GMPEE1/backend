@@ -212,8 +212,15 @@ exports.createEvaresults = async (req, res, next) => {
 exports.evidence = async (req,res,next) => {
   try {
     const { topic_id, u_id, url } = req.body;
-    const parsedUrl = new URL(url);
-    if(!parsedUrl) return res.status(400).json({success:false,message:"Url ไม่ถูกต้อง"});
+    
+    try {
+      new URL(url);
+    } catch {
+      return res.status(400).json({
+        success: false,
+        message: "URL ไม่ถูกต้อง"
+      });
+    }
 
     await db("evidence")
       .insert({
