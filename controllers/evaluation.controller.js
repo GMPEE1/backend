@@ -130,6 +130,7 @@ exports.list = async (req, res, next) => {
       )
       .select(
         "evaluation.eva_id",
+        "users.u_id",
         "users.u_name",
         "evauser.right",
         "evaluation.topic_id",
@@ -212,7 +213,7 @@ exports.createEvaresults = async (req, res, next) => {
 exports.evidence = async (req,res,next) => {
   try {
     const { topic_id, u_id, url } = req.body;
-    
+
     try {
       new URL(url);
     } catch {
@@ -231,6 +232,110 @@ exports.evidence = async (req,res,next) => {
     res.status(201).json({
       success: true,
       message: "เพิ่มหลักฐานสำเร็จ",
+    })
+  } catch (e) {
+    next(e);
+  }
+}
+
+exports.getEvidence = async (req,res,next) => {
+  try {
+    const id = req.params.id;
+    const t_id = req.params.topic_id;
+
+    const topic = await db("evidence")
+      .leftJoin(
+        "topic",
+        "evidence.topic_id",
+        "topic.topic_id"
+      )
+      .select(
+        "evidence.topic_id",
+        "topic.topic_name"
+      )
+      .where("evidence.topic_id", t_id)
+      .first()
+
+    const url = await db("evidence")
+      .select("evidence.url")
+      .where("evidence.topic_id", t_id)
+      .where("evidence.u_id", id);
+    res.status(201).json({
+      success: true,
+      data: {
+        topic,
+        url
+      },
+      total: url.length
+    })
+  } catch (e) {
+    next(e);
+  }
+}
+
+exports.comment = async (req,res,next) => {
+  try {
+    const { topic_id, u_id, u_comment_id, comment } = req.body;
+
+    if(!comment) return res.status(400).json({
+        success: false,
+        message: "กรุณาคอมเมนต์"
+      });
+
+    await db("comment")
+      .insert({
+        topic_id,
+        u_id,
+        u_comment_id,
+        comment
+      })
+    res.status(201).json({
+      success: true,
+      message: "คอมเมนต์สำเร็จ",
+    })
+  } catch (e) {
+    next(e);
+  }
+}
+
+exports.getComment = async (req,res,next) => {
+  try {
+    const id = req.params.id;
+    const t_id = req.params.topic_id;
+
+    const topic = await db("comment")
+      .leftJoin(
+        "topic",
+        "comment.topic_id",
+        "topic.topic_id"
+      )
+      .select(
+        "comment.topic_id",
+        "topic.topic_name"
+      )
+      .where("comment.topic_id", t_id)
+      .first()
+
+    const comment = await db("comment")
+      .leftJoin(
+        "users",
+        "comment.u_comment_id",
+        "users.u_id",
+      )
+      .select(
+        "comment.u_comment_id",
+        "users.u_name",
+        "comment.comment"
+      )
+      .where("comment.topic_id", t_id)
+      .where("comment.u_id", id);
+    res.status(201).json({
+      success: true,
+      data: {
+        topic,
+        comment
+      },
+      total: comment.length
     })
   } catch (e) {
     next(e);
