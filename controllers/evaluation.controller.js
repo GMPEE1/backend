@@ -329,13 +329,33 @@ exports.getComment = async (req,res,next) => {
       )
       .where("comment.topic_id", t_id)
       .where("comment.u_id", id);
+
+    const users = [];
+    comment.forEach(item => {
+      let user = users.find(
+        u => u.u_comment_id === item.u_comment_id
+      );
+
+      if (!user) {
+        user = {
+          u_comment_id: item.u_comment_id,
+          u_name: item.u_name,
+          comments: []
+        };
+
+        users.push(user);
+      }
+
+      user.comments.push(item.comment);
+    });
+
     res.status(201).json({
       success: true,
       data: {
         topic,
-        comment
+        users
       },
-      total: comment.length
+      total: users.length
     })
   } catch (e) {
     next(e);
