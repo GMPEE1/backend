@@ -150,27 +150,19 @@ exports.list = async (req, res, next) => {
 
 exports.getInd = async (req, res, next) => {
   try {
-    const id = req.params.id;
+    const { topic_id, u_id, ueva_id } = req.params;
 
-    const topic = await db("indicator")
-      .leftJoin(
-        "topic",
-        "indicator.topic_id",
-        "topic.topic_id"
-      )
-      .select(
-        "indicator.topic_id",
-        "topic.topic_name"
-      )
-      .where("indicator.topic_id", id)
-      .first()
+    const topic = await db("topic")
+      .where("topic_id", topic_id)
+      .first();
+
+    const user = await db("users")
+      .select("u_id","u_name")
+      .where("u_id", u_id)
+      .first();
 
     const indicator = await db("indicator")
-      .leftJoin(
-        "score",
-        "indicator.score_id",
-        "score.score_id"
-      )
+      .leftJoin("score", "indicator.score_id", "score.score_id")
       .select(
         "indicator.ind_id",
         "indicator.ind_name",
@@ -178,23 +170,29 @@ exports.getInd = async (req, res, next) => {
         "score.score_max",
         "score.score_step1",
         "score.score_step2",
-        "score.score_step3",
+        "score.score_step3"
       )
-      .where("indicator.topic_id", id);
-    
-    res.status(201).json({
+      .where("indicator.topic_id", topic_id);
+
+    const results = await db("evaluation_results")
+      .select("ind_id", "choose")
+      .where({ topic_id, u_id, ueva_id });
+
+    for (const ind of indicator) {
+      ind.choose = results.find(r => r.ind_id === ind.ind_id)?.choose ?? 0;
+    }
+
+    res.status(200).json({
       success: true,
-      data: {
-        topic,
-        indicator
-      },
+      evaluated: results.length > 0,
+      data: { topic, user, indicator },
       total: indicator.length
-    })
-    
+    });
+
   } catch (e) {
     next(e);
   }
-}
+};
 
 exports.createEvaresults = async (req, res, next) => {
   try {
@@ -202,8 +200,37 @@ exports.createEvaresults = async (req, res, next) => {
     await db("evaluation_results").insert(data)
     res.status(201).json({
       success: true,
-      message: "เพิ่มข้อมูลเสร็จสิ้น",
-      total: data.length
+      message: "เพิ่มข้อมูลเสร็จสิ้น"
+    })
+  } catch (e) {
+    next(e);
+  }
+}
+
+exports.updateEvaresults = async (req, res, next) => {
+  try {
+    const { topic_id, u_id, ueva_id } = req.params;
+    const data = req.body;
+
+    await db.transaction(async (trx) => {
+      await Promise.all(
+        data.map(item =>
+          trx("evaluation_results")
+            .where({
+              topic_id,
+              ind_id: item.ind_id,
+              u_id,
+              ueva_id
+            })
+            .update({
+              choose: item.choose
+            })
+        )
+      );
+    });
+    res.status(201).json({
+      success: true,
+      message: "แก้ไขข้อมูลสำเร็จ"
     })
   } catch (e) {
     next(e);
