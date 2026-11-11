@@ -8,6 +8,7 @@ router.get('/:id', ctrl.list)
 router.get('/:topic_id/:u_id/:ueva_id/getInd', ctrl.getInd)
 router.post('/createEvas', ctrl.createEvaresults)
 router.put('/:topic_id/:u_id/:ueva_id/updateEvas', ctrl.updateEvaresults)
+router.put('/:topic_id/:u_id/:ueva_id/sing', upload.single('file'), ctrl.sing)
 
 router.post('/evidence', ctrl.evidence)
 router.get('/:id/:topic_id/evidence', ctrl.getEvidence)

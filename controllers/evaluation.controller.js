@@ -138,10 +138,54 @@ exports.list = async (req, res, next) => {
       )
       .where("evauser.right", "U")
       .whereIn("evauser.eva_id", evaId)
+    const result = await Promise.all(
+      data.map(async item => {
+        const evar = await db("evaluation_results")
+          .leftJoin("indicator", "evaluation_results.ind_id", "indicator.ind_id")
+          .leftJoin("score", "indicator.score_id", "score.score_id")
+          .select(
+            "evaluation_results.choose",
+            "score.score_max",
+            "score.score_step1",
+            "score.score_step2",
+            "score.score_step3"
+          )
+          .where("evaluation_results.ueva_id", item.u_id)
+          .where("evaluation_results.topic_id", item.topic_id);
+
+        // ถ้าไม่มีข้อมูลการประเมิน
+        if (evar.length === 0) {
+          return {
+            ...item,
+            totalScore: "ยังไม่ได้ประเมิน"
+          };
+        }
+
+        let totalScore = 0;
+
+        evar.forEach(s => {
+          if (Number(s.choose) === 1) {
+            totalScore += Number(s.score_step1);
+          } else if (Number(s.choose) === 2) {
+            totalScore += Number(s.score_step2);
+          } else if (Number(s.choose) === 3) {
+            totalScore += Number(s.score_step3);
+          } else if (Number(s.choose) === 4) {
+            totalScore += Number(s.score_max);
+          }
+        });
+
+        return {
+          ...item,
+          totalScore
+        };
+      })
+    );
+
     return res.status(200).json({
       success: true,
-      data: data,
-      total: data.length
+      data: result,
+      total: result.length
     });
   } catch (e) {
     next(e);
@@ -163,6 +207,7 @@ exports.getInd = async (req, res, next) => {
 
     const indicator = await db("indicator")
       .leftJoin("score", "indicator.score_id", "score.score_id")
+      .leftJoin("evaluation_results", "indicator.ind_id", "evaluation_results.ind_id")
       .select(
         "indicator.ind_id",
         "indicator.ind_name",
@@ -170,7 +215,8 @@ exports.getInd = async (req, res, next) => {
         "score.score_max",
         "score.score_step1",
         "score.score_step2",
-        "score.score_step3"
+        "score.score_step3",
+        "evaluation_results.status"
       )
       .where("indicator.topic_id", topic_id);
 
@@ -384,6 +430,23 @@ exports.getComment = async (req,res,next) => {
       },
       total: users.length
     })
+  } catch (e) {
+    next(e);
+  }
+}
+
+exports.sing = async (req,res,next) => {
+  try {
+    const { topic_id, u_id, ueva_id } = req.params;
+    if (!req.file) return res.status(400).json({ success:false, message:'ไม่ได้ส่ง file มาด้วย' });
+    const sing = relFromUploads(req.file.path);
+    await db("evaluation_results").update({sing,status:2})
+      .where("evaluation_results.topic_id",topic_id)
+      .where("evaluation_results.u_id",u_id)
+      .where("evaluation_results.ueva_id",ueva_id)
+    return res.status(200).json({
+      success: true
+    });
   } catch (e) {
     next(e);
   }
