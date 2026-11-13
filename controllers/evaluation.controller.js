@@ -458,6 +458,7 @@ exports.getEvaRe = async (req,res,next) => {
     const Uname = await db("evaluation_results")
       .leftJoin("users","evaluation_results.u_id","users.u_id")
       .select("evaluation_results.u_id","users.u_name")
+      .where("evaluation_results.u_id",u_id)
       .first()
     const evadata = await db("evaluation_results")
       .leftJoin("indicator","evaluation_results.ind_id","indicator.ind_id")
