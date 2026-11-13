@@ -452,96 +452,85 @@ exports.sing = async (req,res,next) => {
   }
 }
 
-exports.getEvaRe = async (req,res,next) => {
+
+exports.getEvaRe = async (req, res, next) => {
   try {
     const { ueva_id, u_id, topic_id } = req.params;
-    const Uname = await db("evaluation_results")
-      .leftJoin("users","evaluation_results.u_id","users.u_id")
-      .select("evaluation_results.u_id","users.u_name")
-      .where("evaluation_results.u_id",u_id)
-      .first()
-    const evadata = await db("evaluation_results")
-      .leftJoin("indicator","evaluation_results.ind_id","indicator.ind_id")
-      .leftJoin("score","indicator.score_id","score.score_id")
-      .select(
-        "evaluation_results.ind_id",
-        "indicator.ind_name",
-        "indicator.score_id",
-        "score.score_max",
-        "score.score_step1",
-        "score.score_step2",
-        "score.score_step3",
-        "evaluation_results.choose"
-      )
-      .where("evaluation_results.ueva_id",ueva_id)
-      .where("evaluation_results.u_id",u_id)
-      .where("evaluation_results.topic_id",topic_id)
-    const userdata = await db("evaluation_results")
-      .leftJoin("indicator","evaluation_results.ind_id","indicator.ind_id")
-      .leftJoin("score","indicator.score_id","score.score_id")
-      .select(
-        "evaluation_results.ind_id",
-        "indicator.ind_name",
-        "indicator.score_id",
-        "score.score_max",
-        "score.score_step1",
-        "score.score_step2",
-        "score.score_step3",
-        "evaluation_results.choose"
-      )
-      .where("evaluation_results.ueva_id",u_id)
-      .where("evaluation_results.u_id",u_id)
-      .where("evaluation_results.topic_id",topic_id)
-    
-    const eva = evadata.map(item => {
-      let score = 0;
 
-      if (item.choose == 1) score = item.score_step1;
-      else if (item.choose == 2) score = item.score_step2;
-      else if (item.choose == 3) score = item.score_step3;
-      else if (item.choose == 4) score = item.score_max;
+    // ชื่อผู้ถูกประเมิน
+    const Uname = await db("users")
+      .select("u_id", "u_name")
+      .where("u_id", u_id)
+      .first();
+
+    // ข้อมูลคะแนน
+    const getData = async (id) => {
+      return await db("evaluation_results")
+        .leftJoin("indicator", "evaluation_results.ind_id", "indicator.ind_id")
+        .leftJoin("score", "indicator.score_id", "score.score_id")
+        .select(
+          "evaluation_results.ind_id",
+          "indicator.ind_name",
+          "score.score_max",
+          "score.score_step1",
+          "score.score_step2",
+          "score.score_step3",
+          "evaluation_results.choose"
+        )
+        .where("evaluation_results.ueva_id", id)
+        .where("evaluation_results.u_id", u_id)
+        .where("evaluation_results.topic_id", topic_id);
+    };
+
+    // ดึงคะแนนทั้งสองชุด
+    const evadata = await getData(ueva_id);
+    const userdata = await getData(u_id);
+
+    // คำนวณคะแนน
+    const getScore = (choose, item) => {
+      if (choose == 1) return item.score_step1;
+      if (choose == 2) return item.score_step2;
+      if (choose == 3) return item.score_step3;
+      if (choose == 4) return item.score_max;
+      return 0;
+    };
+
+    // รวมคะแนนทั้งสองชุด
+    const eva = evadata.map(item => {
+      const user = userdata.find(
+        u => u.ind_id == item.ind_id
+      );
 
       return {
         ind_id: item.ind_id,
         ind_name: item.ind_name,
-        score: score
+        score: getScore(item.choose, item),
+        userScore: user ? getScore(user.choose, item) : 0
       };
     });
 
     // รวมคะแนนทั้งหมด
     const results = eva.reduce(
-      (sum, item) => sum + Number(item.score || 0),
-      0
+      (sum, item) => sum + Number(item.score || 0), 0
     );
 
-    const User = userdata.map(item => {
-      let score = 0;
-
-      if (item.choose == 1) score = item.score_step1;
-      else if (item.choose == 2) score = item.score_step2;
-      else if (item.choose == 3) score = item.score_step3;
-      else if (item.choose == 4) score = item.score_max;
-
-      return {
-        ind_id: item.ind_id,
-        ind_name: item.ind_name,
-        score: score
-      };
-    });
-
-    // รวมคะแนนทั้งหมด
-    const Uresults = User.reduce(
-      (sum, item) => sum + Number(item.score || 0),
-      0
+    const Uresults = eva.reduce(
+      (sum, item) => sum + Number(item.userScore || 0), 0
     );
 
     res.status(200).json({
       success: true,
       message: "ดึงข้อมูลสำเร็จ",
-      item: {Uname,eva,results,User,Uresults},
-      evatotal: eva.length
-    })
+      item: {
+        Uname,
+        eva,
+        results,
+        Uresults
+      },
+      total: eva.length
+    });
+
   } catch (e) {
-    next(e)
+    next(e);
   }
-}
+};
