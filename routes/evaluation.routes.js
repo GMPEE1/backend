@@ -16,4 +16,6 @@ router.get('/:id/:topic_id/evidence', ctrl.getEvidence)
 router.post('/comment', ctrl.comment)
 router.get('/:id/:topic_id/comment', ctrl.getComment)
 
+router.get('/:topic_id/:u_id/:ueva_id/getEvaRe', ctrl.getEvaRe)
+
 module.exports = router;
