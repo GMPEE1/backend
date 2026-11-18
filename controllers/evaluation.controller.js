@@ -108,9 +108,11 @@ exports.create = async (req, res, next) => {
 
 exports.list = async (req, res, next) => {
   try {
+    const u_id = req.params.id
     const evau = await db("evauser")
       .select("eva_id")
-      .where({ u_id: req.params.id})
+      .where("u_id",u_id)
+    const Uname = await db("users").select("u_id","u_name").where("u_id",u_id).first()
     const evaId = evau.map((item) => item.eva_id);
     const data = await db("evauser")
       .leftJoin(
@@ -145,6 +147,7 @@ exports.list = async (req, res, next) => {
           .leftJoin("score", "indicator.score_id", "score.score_id")
           .select(
             "evaluation_results.choose",
+            "evaluation_results.status",
             "score.score_max",
             "score.score_step1",
             "score.score_step2",
@@ -152,11 +155,11 @@ exports.list = async (req, res, next) => {
           )
           .where("evaluation_results.ueva_id", item.u_id)
           .where("evaluation_results.topic_id", item.topic_id);
-
         // ถ้าไม่มีข้อมูลการประเมิน
         if (evar.length === 0) {
           return {
             ...item,
+            status: 0,
             totalScore: "ยังไม่ได้ประเมิน"
           };
         }
@@ -177,6 +180,7 @@ exports.list = async (req, res, next) => {
 
         return {
           ...item,
+          status: evar[0].status,
           totalScore
         };
       })
@@ -184,7 +188,7 @@ exports.list = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      data: result,
+      data: {Uname,result},
       total: result.length
     });
   } catch (e) {
@@ -207,7 +211,6 @@ exports.getInd = async (req, res, next) => {
 
     const indicator = await db("indicator")
       .leftJoin("score", "indicator.score_id", "score.score_id")
-      .leftJoin("evaluation_results", "indicator.ind_id", "evaluation_results.ind_id")
       .select(
         "indicator.ind_id",
         "indicator.ind_name",
@@ -215,17 +218,21 @@ exports.getInd = async (req, res, next) => {
         "score.score_max",
         "score.score_step1",
         "score.score_step2",
-        "score.score_step3",
-        "evaluation_results.status"
+        "score.score_step3"
       )
       .where("indicator.topic_id", topic_id);
 
     const results = await db("evaluation_results")
-      .select("ind_id", "choose")
+      .select("ind_id", "choose", "status")
       .where({ topic_id, u_id, ueva_id });
 
     for (const ind of indicator) {
-      ind.choose = results.find(r => r.ind_id === ind.ind_id)?.choose ?? 0;
+      const result = results.find(
+        r => Number(r.ind_id) === Number(ind.ind_id)
+      );
+
+      ind.choose = result?.choose ?? 0;
+      ind.status = result?.status ?? 0;
     }
 
     res.status(200).json({
@@ -269,7 +276,8 @@ exports.updateEvaresults = async (req, res, next) => {
               ueva_id
             })
             .update({
-              choose: item.choose
+              choose: item.choose,
+              status: 1
             })
         )
       );
@@ -463,6 +471,11 @@ exports.getEvaRe = async (req, res, next) => {
       .where("u_id", u_id)
       .first();
 
+    const Tname = await db("topic")
+      .select("topic_id", "topic_name")
+      .where("topic_id", topic_id)
+      .first();
+
     // ข้อมูลคะแนน
     const getData = async (id) => {
       return await db("evaluation_results")
@@ -504,15 +517,18 @@ exports.getEvaRe = async (req, res, next) => {
       return {
         ind_id: item.ind_id,
         ind_name: item.ind_name,
+        score_max: item.score_max,
         score: getScore(item.choose, item),
         userScore: user ? getScore(user.choose, item) : 0
       };
     });
 
     // รวมคะแนนทั้งหมด
-    const results = eva.reduce(
+    const sum = eva.reduce(
       (sum, item) => sum + Number(item.score || 0), 0
     );
+
+    const results = ( sum / 100 ) * 100;
 
     const Uresults = eva.reduce(
       (sum, item) => sum + Number(item.userScore || 0), 0
@@ -523,7 +539,9 @@ exports.getEvaRe = async (req, res, next) => {
       message: "ดึงข้อมูลสำเร็จ",
       item: {
         Uname,
+        Tname,
         eva,
+        sum,
         results,
         Uresults
       },
@@ -534,3 +552,93 @@ exports.getEvaRe = async (req, res, next) => {
     next(e);
   }
 };
+
+exports.evalist = async (req, res, next) => {
+  try {
+    const u_id = req.params.id
+    const evau = await db("evauser")
+      .select("eva_id")
+      .where("u_id",u_id)
+    const Uname = await db("users").select("u_id","u_name").where("u_id",u_id).first()
+    const evaId = evau.map((item) => item.eva_id);
+    const data = await db("evauser")
+      .leftJoin(
+        "evaluation",
+        "evauser.eva_id",
+        "evaluation.eva_id"
+      )
+      .leftJoin(
+        "topic",
+        "evaluation.topic_id",
+        "topic.topic_id"
+      )
+      .leftJoin(
+        "users",
+        "evauser.u_id",
+        "users.u_id"
+      )
+      .select(
+        "evaluation.eva_id",
+        "users.u_id",
+        "users.u_name",
+        "evauser.right",
+        "evaluation.topic_id",
+        "topic.topic_name"
+      )
+      .where("evauser.right", "U")
+      .whereIn("evauser.eva_id", evaId)
+    const result = await Promise.all(
+      data.map(async item => {
+        const evar = await db("evaluation_results")
+          .leftJoin("indicator", "evaluation_results.ind_id", "indicator.ind_id")
+          .leftJoin("score", "indicator.score_id", "score.score_id")
+          .select(
+            "evaluation_results.choose",
+            "evaluation_results.status",
+            "score.score_max",
+            "score.score_step1",
+            "score.score_step2",
+            "score.score_step3"
+          )
+          .where("evaluation_results.ueva_id", u_id)
+          .where("evaluation_results.topic_id", item.topic_id);
+        // ถ้าไม่มีข้อมูลการประเมิน
+        if (evar.length === 0) {
+          return {
+            ...item,
+            status: 0,
+            totalScore: "ยังไม่ได้ประเมิน"
+          };
+        }
+
+        let totalScore = 0;
+
+        evar.forEach(s => {
+          if (Number(s.choose) === 1) {
+            totalScore += Number(s.score_step1);
+          } else if (Number(s.choose) === 2) {
+            totalScore += Number(s.score_step2);
+          } else if (Number(s.choose) === 3) {
+            totalScore += Number(s.score_step3);
+          } else if (Number(s.choose) === 4) {
+            totalScore += Number(s.score_max);
+          }
+        });
+
+        return {
+          ...item,
+          status: evar[0].status,
+          totalScore
+        };
+      })
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: {Uname,result},
+      total: result.length
+    });
+  } catch (e) {
+    next(e);
+  }
+}

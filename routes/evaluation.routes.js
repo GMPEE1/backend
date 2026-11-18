@@ -5,6 +5,7 @@ const ctrl = require('../controllers/evaluation.controller');
 router.post('/', ctrl.create)
 router.get('/:id/get', ctrl.getEva)
 router.get('/:id', ctrl.list)
+router.get('/:id/evalist', ctrl.evalist)
 router.get('/:topic_id/:u_id/:ueva_id/getInd', ctrl.getInd)
 router.post('/createEvas', ctrl.createEvaresults)
 router.put('/:topic_id/:u_id/:ueva_id/updateEvas', ctrl.updateEvaresults)

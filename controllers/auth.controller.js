@@ -37,11 +37,8 @@ exports.login = async (req, res, next) => {
     }
 
     // 2) เปรียบเทียบรหัสผ่าน
-    const password = await db("users")
-      .select("u_id", "u_name", "u_email", "u_role", "u_password", "u_pw_status")
-      .where({ u_password })
-      .first();
-    if (!password) {
+    const ok = (users.u_password == u_password)
+    if (!ok) {
       return res
         .status(401)
         .json({ success: false, message: "Invalid credentials-password" });
